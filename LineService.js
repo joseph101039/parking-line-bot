@@ -16,21 +16,21 @@ function _lineFetch(path, options) {
     const resp = UrlFetchApp.fetch(url, options);
     try { return JSON.parse(resp.getContentText()); } catch (e) { return resp.getContentText(); }
   }
-
+  
   function replyRaw(replyToken, messages) {
     const path = "/v2/bot/message/reply";
     const payload = { replyToken: replyToken, messages: messages };
     return _lineFetch(path, { method: "post", payload: payload });
   }
-
+  
   function replyText(replyToken, text) {
     return replyRaw(replyToken, [{ type: "text", text: text }]);
   }
-
+  
   function replyFlex(replyToken, altText, contents) {
     return replyRaw(replyToken, [{ type: "flex", altText: altText, contents: contents }]);
   }
-
+  
   // get profile of a userId (displayName, pictureUrl, statusMessage)
   function getProfile(userId) {
     try {
@@ -40,7 +40,7 @@ function _lineFetch(path, options) {
       return null;
     }
   }
-
+  
   /*
     Get group/room member ids.
     If you have groupId, call /v2/bot/group/{groupId}/members/ids
@@ -57,7 +57,7 @@ function _lineFetch(path, options) {
       return [];
     }
   }
-
+  
   // get many profiles (batch by ids)
   function getProfilesForIds(ids) {
     const profiles = [];

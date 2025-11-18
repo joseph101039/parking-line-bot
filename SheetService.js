@@ -10,7 +10,7 @@ function _getSheet() {
     if (!sheet) throw new Error("No sheet named " + cfg.SHEET_NAME);
     return sheet;
   }
-
+  
   function getAllRecords() {
     const sheet = _getSheet();
     const data = sheet.getDataRange().getValues();
@@ -23,7 +23,7 @@ function _getSheet() {
       return obj;
     });
   }
-
+  
   function findRowBySpace(spaceNumber) {
     const sheet = _getSheet();
     const data = sheet.getDataRange().getValues();
@@ -40,7 +40,7 @@ function _getSheet() {
     }
     return null;
   }
-
+  
   function appendOrUpdateRecord(spaceNumber, record) {
     const sheet = _getSheet();
     const found = findRowBySpace(spaceNumber);

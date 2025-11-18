@@ -1,7 +1,7 @@
 // Code.gs
 // 入口：doPost - 接收 LINE webhook
 function doPost(e) {
-  Logger.log(e.postData.contents);
+  Logger.log(e); // logging all requests
   try {
     const payload = JSON.parse(e.postData.contents);
     const events = payload.events || [];
