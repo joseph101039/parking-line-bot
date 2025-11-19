@@ -5,6 +5,12 @@ class FlowServiceClass {
     this.cfg = getConfig();
     this.lineService = lineService;
     this.sheetService = sheetService;
+    this.totalSpaces = this._resolveTotalSpaces();
+  }
+
+  _resolveTotalSpaces() {
+    const configured = parseInt(this.cfg.TOTAL_SPACES, 10);
+    return isNaN(configured) ? 20 : configured;
   }
 
   _cacheKey(userId) { return "flow_" + userId; }
@@ -24,79 +30,113 @@ class FlowServiceClass {
 
   // Reply full parking list (查詢車位)
   replyParkingList(replyToken) {
+    const flexContents = this.buildParkingFlexContents();
+    this.lineService.replyFlex(replyToken, "車位清單", flexContents);
+  }
+
+  buildParkingFlexContents() {
+    const slots = this._buildOrderedSlots();
+    const bubbles = this._buildSlotBubbles(slots);
+    if (bubbles.length === 1) return bubbles[0];
+    return { type: "carousel", contents: bubbles };
+  }
+
+  _buildOrderedSlots() {
     const records = this.getAllRecordsSafe();
-    // build Flex bubble list
-    const bubbles = records.map(rec => this.buildParkingBubble(rec));
-    const flex = {
-      type: "carousel",
-      contents: bubbles.length ? bubbles : [{
-        type: "bubble",
-        body: { type: "box", layout: "vertical", contents: [{ type: "text", text: "沒有車位紀錄" }] }
-      }]
-    };
-    this.lineService.replyFlex(replyToken, "車位清單", flex);
-  }
-
-  getAllRecordsSafe() {
-    try {
-      return this.sheetService.getAllRecords();
-    } catch (e) {
-      console.error("getAllRecords error", e);
-      return [];
+    const lookup = {};
+    records.forEach(rec => {
+      if (rec && rec["space_number"] !== undefined && rec["space_number"] !== null) {
+        lookup[String(rec["space_number"])] = rec;
+      }
+    });
+    const slots = [];
+    for (let space = 1; space <= this.totalSpaces; space++) {
+      slots.push({ space: space, record: lookup[String(space)] || null });
     }
+    return slots;
   }
 
-  buildParkingBubble(rec) {
-    // rec keys: space_number, license_plate, owner, address_num, address_floor, contact_person, contact_phone, enabled, owner_line_id
-    const ownerIsLine = (String(rec["owner_line_id"]).toLowerCase() === "true" || rec["owner_line_id"] === true);
-    const heroImage = ownerIsLine ? (() => {
-      try {
-        const prof = this.lineService.getProfile(String(rec["owner"]));
-        if (prof && prof.pictureUrl) return prof.pictureUrl;
-      } catch (e) { }
-      return null;
-    })() : null;
+  _buildSlotBubbles(slots) {
+    const rowsPerBubble = 8;
+    const bubbles = [];
+    const totalPages = Math.ceil(slots.length / rowsPerBubble) || 1;
+    for (let i = 0; i < slots.length; i += rowsPerBubble) {
+      const chunk = slots.slice(i, i + rowsPerBubble);
+      const page = Math.floor(i / rowsPerBubble) + 1;
+      bubbles.push(this._buildTableBubble(chunk, page, totalPages));
+    }
+    return bubbles;
+  }
 
-    const ownerContent = ownerIsLine && heroImage ? {
-      type: "box",
-      layout: "vertical",
-      contents: [
-        {
-          type: "image",
-          url: heroImage,
-          size: "xxs",
-          aspectMode: "cover",
-          action: {
-            type: "postback",
-            label: "tag",
-            data: "tagOwner:" + String(rec["owner"])
-          }
-        },
-        { type: "text", text: String(rec["owner"] || ""), size: "xs", wrap: true }
-      ],
-      spacing: "sm",
-      width: "120px"
-    } : {
-      type: "text",
-      text: String(rec["owner"] || ""),
-      size: "sm",
-      wrap: true,
-      flex: 2
-    };
-
+  _buildTableBubble(chunk, page, totalPages) {
+    if (!chunk.length) {
+      return {
+        type: "bubble",
+        body: {
+          type: "box",
+          layout: "vertical",
+          contents: [{ type: "text", text: "沒有車位紀錄", weight: "bold", size: "lg" }]
+        }
+      };
+    }
+    const startSpace = chunk[0].space;
+    const endSpace = chunk[chunk.length - 1].space;
     return {
       type: "bubble",
       body: {
         type: "box",
         layout: "vertical",
         contents: [
-          { type: "text", text: "車道 " + String(rec["space_number"]), weight: "bold", size: "lg" },
-          { type: "text", text: "車牌：" + String(rec["license_plate"] || ""), size: "sm" },
-          { type: "text", text: "地址：" + (rec["address_num"] || "") + " / " + (rec["address_floor"] || ""), size: "sm" },
-          { type: "box", layout: "baseline", contents: [{ type: "text", text: "聯絡：" + (rec["contact_person"] || ""), size: "sm" }], spacing: "sm" },
-          ownerContent
+          { type: "text", text: "車位列表", weight: "bold", size: "lg" },
+          {
+            type: "text",
+            text: `${startSpace}-${endSpace} 號 / ${page} / ${totalPages}`,
+            size: "xs",
+            color: "#999999",
+            margin: "sm"
+          },
+          {
+            type: "box",
+            layout: "vertical",
+            margin: "md",
+            spacing: "xs",
+            contents: [
+              this._buildTableRow(["車道", "車牌", "擁有者", "聯絡人", "電話"], true)
+            ].concat(chunk.map(slot => this._buildDataRow(slot)))
+          }
         ]
       }
+    };
+  }
+
+  _buildDataRow(slot) {
+    const record = slot.record || {};
+    return this._buildTableRow([
+      String(slot.space),
+      record["license_plate"] || "-",
+      record["owner"] || "-",
+      record["contact_person"] || "-",
+      record["contact_phone"] || "-"
+    ], false);
+  }
+
+  _buildTableRow(cells, isHeader) {
+    const flexes = [1, 2, 2, 2, 2];
+    return {
+      type: "box",
+      layout: "baseline",
+      spacing: "sm",
+      backgroundColor: isHeader ? "#f2f3f4" : undefined,
+      paddingAll: "4px",
+      contents: cells.map((text, idx) => ({
+        type: "text",
+        text: text || "-",
+        size: isHeader ? "xs" : "sm",
+        color: isHeader ? "#666666" : "#111111",
+        weight: isHeader ? "bold" : "regular",
+        flex: flexes[idx] || 1,
+        wrap: true
+      }))
     };
   }
 
@@ -107,7 +147,7 @@ class FlowServiceClass {
       payload: {}
     };
     this.setState(userId, initial);
-    this.lineService.replyText(replyToken, "請輸入車道（1～20）：");
+    this.lineService.replyText(replyToken, "請輸入車道（1～" + this.totalSpaces + "）：");
   }
 
   // Process free text input during flow
@@ -121,8 +161,8 @@ class FlowServiceClass {
 
     if (step === "ask_space") {
       const num = parseInt(text, 10);
-      if (isNaN(num) || num < 1 || num > 20) {
-        this.lineService.replyText(replyToken, "請輸入 1～20 的數字");
+      if (isNaN(num) || num < 1 || num > this.totalSpaces) {
+        this.lineService.replyText(replyToken, "請輸入 1～" + this.totalSpaces + " 的數字");
         return;
       }
       state.payload.space = num;

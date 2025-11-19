@@ -1,7 +1,7 @@
 // Code.gs
 // 入口：doPost - 接收 LINE webhook
 function doPost(e) {
-  Logger.log(e); // logging all requests
+  // Logger.log(e); // logging all requests
   try {
     const payload = JSON.parse(e.postData.contents);
     const events = payload.events || [];
@@ -41,6 +41,11 @@ function handleTextEvent(ev) {
     return;
   }
 
+  if (text === "管理員設置")  {
+      AdminController.startAdminSetting(ev);
+      return;
+  }
+
   // 若使用者正在流程中，交給流程處理
   if (FlowService.isUserInFlow(userId)) {
     FlowService.processFlowText(replyToken, userId, text);
@@ -54,5 +59,13 @@ function handleTextEvent(ev) {
 // postback event
 function handlePostbackEvent(ev) {
   const userId = ev.source.userId;
-  FlowService.processFlowPostback(ev.replyToken, userId, ev.postback.data);
+  const data = ev.postback && ev.postback.data ? ev.postback.data : "";
+  if (data && data.indexOf("adminSetting:") === 0) {
+    AdminController.processPostback(ev, data);
+    return;
+  }
+  FlowService.processFlowPostback(ev.replyToken, userId, data);
 }
+
+const AdminSettingService = new AdminSettingServiceClass();
+const AdminController = new AdminControllerClass();

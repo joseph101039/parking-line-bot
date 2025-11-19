@@ -42,6 +42,11 @@ class SheetServiceClass {
     return null;
   }
 
+  getRecordMap(spaceNumber) {
+    const found = this.findRowBySpace(spaceNumber);
+    return found ? found.map : null;
+  }
+
   appendOrUpdateRecord(spaceNumber, record) {
     const sheet = this._getSheet();
     const found = this.findRowBySpace(spaceNumber);

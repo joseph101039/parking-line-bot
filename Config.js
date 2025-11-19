@@ -11,6 +11,7 @@ function getConfig() {
     GROUP_ROOM_ID: props.getProperty("LINE_GROUP_ID") || "xxxx",
     SHEET_NAME: props.getProperty("SHEET_NAME") || "parking",
     // Cache TTL (seconds)
-    CACHE_TTL: parseInt(props.getProperty("CACHE_TTL") || "600", 10)
+    CACHE_TTL: parseInt(props.getProperty("CACHE_TTL") || "600", 10),
+    TOTAL_SPACES: props.getProperty("TOTAL_SPACES") || "20"
   };
 }
