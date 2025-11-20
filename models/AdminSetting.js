@@ -25,7 +25,11 @@ class AdminSetting {
     }
 
     static setUserGroupId(groupId) {
-        return new AdminSetting({key: "user_group_id", value: groupId, annotation: "取得 user 來源的群組 ID"});
+        return new AdminSetting({key: this.getUserGroupIdKey(), value: groupId, annotation: "取得 user 來源的群組 ID"});
+    }
+
+    static getUserGroupIdKey() {
+        return "user_group_id"
     }
 
 }

@@ -1,10 +1,8 @@
 // FlowService.gs
 // 控制 multi-step 編輯流程，暫存使用 CacheService per-user
 class FlowServiceClass {
-  constructor(lineService, sheetService) {
+  constructor() {
     this.cfg = getConfig();
-    this.lineService = lineService;
-    this.sheetService = sheetService;
     this.totalSpaces = this._resolveTotalSpaces();
   }
 
@@ -31,7 +29,7 @@ class FlowServiceClass {
   // Reply full parking list (查詢車位)
   replyParkingList(replyToken) {
     const flexContents = this.buildParkingFlexContents();
-    this.lineService.replyFlex(replyToken, "車位清單", flexContents);
+    LineService.replyFlex(replyToken, "車位清單", flexContents);
   }
 
   buildParkingFlexContents() {
@@ -42,7 +40,7 @@ class FlowServiceClass {
   }
 
   _buildOrderedSlots() {
-    const records = this.getAllRecordsSafe();
+    const records = ParkingService.getAll();
     const lookup = {};
     records.forEach(rec => {
       if (rec && rec["space_number"] !== undefined && rec["space_number"] !== null) {
@@ -147,14 +145,14 @@ class FlowServiceClass {
       payload: {}
     };
     this.setState(userId, initial);
-    this.lineService.replyText(replyToken, "請輸入車道（1～" + this.totalSpaces + "）：");
+    LineService.replyText(replyToken, "請輸入車道（1～" + this.totalSpaces + "）：");
   }
 
   // Process free text input during flow
   processFlowText(replyToken, userId, text) {
     const state = this.getState(userId);
     if (!state) {
-      this.lineService.replyText(replyToken, "流程不存在，請輸入「編輯車位」重新開始。");
+      LineService.replyText(replyToken, "流程不存在，請輸入「編輯車位」重新開始。");
       return;
     }
     const step = state.step;
@@ -162,12 +160,12 @@ class FlowServiceClass {
     if (step === "ask_space") {
       const num = parseInt(text, 10);
       if (isNaN(num) || num < 1 || num > this.totalSpaces) {
-        this.lineService.replyText(replyToken, "請輸入 1～" + this.totalSpaces + " 的數字");
+        LineService.replyText(replyToken, "請輸入 1～" + this.totalSpaces + " 的數字");
         return;
       }
       state.payload.space = num;
       // check existing
-      const found = this.sheetService.findRowBySpace(num);
+      const found = ParkingService.findBySpace(num);
       if (found) {
         state.payload.original = found.map;
         state.step = "ask_new_plate_existing";
@@ -192,7 +190,7 @@ class FlowServiceClass {
             ]
           }
         };
-        this.lineService.replyFlex(replyToken, "編輯車位 - 車牌", flex);
+        LineService.replyFlex(replyToken, "編輯車位 - 車牌", flex);
       } else {
         state.step = "ask_new_plate_new";
         this.setState(userId, state);
@@ -213,7 +211,7 @@ class FlowServiceClass {
             ]
           }
         };
-        this.lineService.replyFlex(replyToken, "新增車位 - 車牌", flex);
+        LineService.replyFlex(replyToken, "新增車位 - 車牌", flex);
       }
       return;
     }
@@ -222,7 +220,7 @@ class FlowServiceClass {
     if (step === "ask_new_plate_existing" || step === "ask_new_plate_new") {
       const plateNormalized = normalizePlate(text);
       if (!validatePlate(plateNormalized)) {
-        this.lineService.replyText(replyToken, '請輸入「三碼英文-四碼數字」，例如「ABC-1234」');
+        LineService.replyText(replyToken, '請輸入「三碼英文-四碼數字」，例如「ABC-1234」');
         return;
       }
       state.payload.license_plate = plateNormalized;
@@ -240,7 +238,7 @@ class FlowServiceClass {
       state.payload.owner_line_id = false;
       state.step = "ask_address_num";
       this.setState(userId, state);
-      this.lineService.replyText(replyToken, "請輸入地址號碼（例如 8 或 10）：");
+      LineService.replyText(replyToken, "請輸入地址號碼（例如 8 或 10）：");
       return;
     }
 
@@ -248,7 +246,7 @@ class FlowServiceClass {
       state.payload.address_num = text;
       state.step = "ask_address_floor";
       this.setState(userId, state);
-      this.lineService.replyText(replyToken, "請輸入樓層（例如 5 或 5-1）：");
+      LineService.replyText(replyToken, "請輸入樓層（例如 5 或 5-1）：");
       return;
     }
 
@@ -265,7 +263,7 @@ class FlowServiceClass {
       state.payload.contact_person = text;
       state.step = "ask_contact_phone";
       this.setState(userId, state);
-      this.lineService.replyText(replyToken, "請輸入聯絡電話（例如 0978xxxxxx）：");
+      LineService.replyText(replyToken, "請輸入聯絡電話（例如 0978xxxxxx）：");
       return;
     }
 
@@ -273,7 +271,7 @@ class FlowServiceClass {
       state.payload.contact_phone = text;
       state.step = "ask_more_contact";
       this.setState(userId, state);
-      this.lineService.replyText(replyToken, "是否要新增其他聯絡人？回覆「是」或「否」");
+      LineService.replyText(replyToken, "是否要新增其他聯絡人？回覆「是」或「否」");
       return;
     }
 
@@ -285,7 +283,7 @@ class FlowServiceClass {
         // we append contact as additional by storing array
         state.payload.additional_contacts = state.payload.additional_contacts || [];
         this.setState(userId, state);
-        this.lineService.replyText(replyToken, "請輸入其他聯絡人姓名：");
+        LineService.replyText(replyToken, "請輸入其他聯絡人姓名：");
       } else {
         // finalize save
         this.finalizeSave(replyToken, userId);
@@ -294,7 +292,7 @@ class FlowServiceClass {
     }
 
     // fallback
-    this.lineService.replyText(replyToken, "輸入無法辨識，請依系統提示操作。");
+    LineService.replyText(replyToken, "輸入無法辨識，請依系統提示操作。");
   } // end processFlowText
 
   // handle postback data like skipPlate, cancel, selectOwner:USERID, tagOwner:USERID, selectContact:USERID
@@ -303,7 +301,7 @@ class FlowServiceClass {
     // universal cancel
     if (data === "cancel") {
       this.clearState(userId);
-      this.lineService.replyText(replyToken, "本次操作沒有任何異動");
+      LineService.replyText(replyToken, "本次操作沒有任何異動");
       return;
     }
     if (!state) {
@@ -311,14 +309,14 @@ class FlowServiceClass {
       if (data && data.indexOf("tagOwner:") === 0) {
         const ownerId = data.split(":")[1];
         try {
-          const p = this.lineService.getProfile(ownerId);
+          const p = LineService.getProfile(ownerId);
           const name = (p && p.displayName) ? p.displayName : ownerId;
-          this.lineService.replyText(replyToken, "標註：" + name);
+          LineService.replyText(replyToken, "標註：" + name);
         } catch (e) {
-          this.lineService.replyText(replyToken, "標註操作失敗");
+          LineService.replyText(replyToken, "標註操作失敗");
         }
       } else {
-        this.lineService.replyText(replyToken, "流程已過期或不存在，請重新開始（輸入「編輯車位」）");
+        LineService.replyText(replyToken, "流程已過期或不存在，請重新開始（輸入「編輯車位」）");
       }
       return;
     }
@@ -337,47 +335,43 @@ class FlowServiceClass {
 
     // selectOwner:{userId}
     if (data.indexOf("selectOwner:") === 0) {
-      const sel = data.split(":")[1];
-      // set owner as that userId and mark owner_line_id true
-      state.payload.owner = sel;
+      state.payload.owner = data.split(":" )[1];
       state.payload.owner_line_id = true;
       state.step = "ask_address_num";
       this.setState(userId, state);
-      this.lineService.replyText(replyToken, "請輸入地址號碼（例如 8 或 10）：");
+      LineService.replyText(replyToken, "請輸入地址號碼（例如 8 或 10）：");
       return;
     }
 
     // selectContact:{userId}
     if (data.indexOf("selectContact:") === 0) {
-      const sel = data.split(":")[1];
-      state.payload.contact_person = sel;
+      state.payload.contact_person = data.split(":" )[1];
       // treat contact person from LINE id as owner_line_id? we'll mark contact as line id if selected
       state.payload.contact_is_line = true;
       state.step = "ask_contact_phone";
       this.setState(userId, state);
-      this.lineService.replyText(replyToken, "請輸入聯絡電話（例如 0978xxxxxx）：");
+      LineService.replyText(replyToken, "請輸入聯絡電話（例如 0978xxxxxx）：");
       return;
     }
 
     // tagOwner: used when clicking avatar in list
     if (data.indexOf("tagOwner:") === 0) {
-      const ownerId = data.split(":")[1];
-      const p = this.lineService.getProfile(ownerId);
+      const ownerId = data.split(":" )[1];
+      const p = LineService.getProfile(ownerId);
       const name = (p && p.displayName) ? p.displayName : ownerId;
-      this.lineService.replyText(replyToken, "嘗試標註：" + name);
-      return;
+      LineService.replyText(replyToken, "嘗試標註：" + name);
     }
   }
 
-  askOwnerSelection(replyToken, userId) {
+  askOwnerSelection(replyToken) {
     const groupId = this.cfg.GROUP_ROOM_ID;
     if (!groupId) {
-      this.lineService.replyText(replyToken, "無法取得群組設定，請直接輸入擁有者名稱。");
+      LineService.replyText(replyToken, "無法取得群組設定，請直接輸入擁有者名稱。");
       return;
     }
-    const ids = this.lineService.getGroupMemberIds(groupId, /*isRoom=*/false);
+    const ids = LineService.getGroupMemberIds(groupId, /*isRoom=*/false);
     const actions = ids.slice(0, 10).map(id => {
-      const p = this.lineService.getProfile(id);
+      const p = LineService.getProfile(id);
       const label = p && p.displayName ? p.displayName : (id || "user");
       return {
         type: "button",
@@ -395,18 +389,18 @@ class FlowServiceClass {
       },
       footer: { type: "box", layout: "vertical", contents: actions.concat([{ type: "button", action: { type: "postback", label: "取消", data: "cancel" } }]) }
     };
-    this.lineService.replyFlex(replyToken, "選擇擁有者", { type: "carousel", contents: [contents] });
+    LineService.replyFlex(replyToken, "選擇擁有者", { type: "carousel", contents: [contents] });
   }
 
-  askContactSelection(replyToken, userId) {
+  askContactSelection(replyToken) {
     const groupId = this.cfg.GROUP_ROOM_ID;
     if (!groupId) {
-      this.lineService.replyText(replyToken, "無法取得群組設定，請直接輸入聯絡人姓名。");
+      LineService.replyText(replyToken, "無法取得群組設定，請直接輸入聯絡人姓名。");
       return;
     }
-    const ids = this.lineService.getGroupMemberIds(groupId, /*isRoom=*/false);
+    const ids = LineService.getGroupMemberIds(groupId, /*isRoom=*/false);
     const actions = ids.slice(0, 10).map(id => {
-      const p = this.lineService.getProfile(id);
+      const p = LineService.getProfile(id);
       const label = p && p.displayName ? p.displayName : (id || "user");
       return {
         type: "button",
@@ -424,14 +418,14 @@ class FlowServiceClass {
       },
       footer: { type: "box", layout: "vertical", contents: actions.concat([{ type: "button", action: { type: "postback", label: "取消", data: "cancel" } }]) }
     };
-    this.lineService.replyFlex(replyToken, "選擇聯絡人", { type: "carousel", contents: [contents] });
+    LineService.replyFlex(replyToken, "選擇聯絡人", { type: "carousel", contents: [contents] });
   }
 
   // finalize and save to sheet
   finalizeSave(replyToken, userId) {
     const state = this.getState(userId);
     if (!state || !state.payload) {
-      this.lineService.replyText(replyToken, "流程資料遺失，請重新操作。");
+      LineService.replyText(replyToken, "流程資料遺失，請重新操作。");
       this.clearState(userId);
       return;
     }
@@ -449,14 +443,14 @@ class FlowServiceClass {
     record["owner_line_id"] = !!p.owner_line_id;
 
     try {
-      this.sheetService.appendOrUpdateRecord(p.space, record);
-      this.lineService.replyText(replyToken, "儲存資料，儲存成功 ✅");
+      ParkingService.upsert(p.space, record);
+      LineService.replyText(replyToken, "儲存資料，儲存成功 ✅");
       this.clearState(userId);
     } catch (e) {
       console.error("save error", e);
-      this.lineService.replyText(replyToken, "儲存失敗，請稍後再試。");
+      LineService.replyText(replyToken, "儲存失敗，請稍後再試。");
     }
   }
 }
 
-const FlowService = new FlowServiceClass(LineService, SheetService);
+const FlowService = new FlowServiceClass();

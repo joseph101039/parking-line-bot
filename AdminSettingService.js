@@ -30,6 +30,7 @@ class AdminSettingServiceClass {
   saveUserGroupId(groupId) {
     const setting = AdminSetting.setUserGroupId(groupId);
     this.upsert(setting);
+    this.syncGroupUsers(groupId);
   }
 
   upsert(setting) {
@@ -61,6 +62,11 @@ class AdminSettingServiceClass {
     return null;
   }
 
+  getUserGroupId() {
+    const setting = this.getSetting(AdminSetting.getUserGroupIdKey());
+    return setting && setting.value ? setting.value : null;
+  }
+
   _headerLabels() {
     const names = AdminSetting.getFieldNames();
     return this.columns.map(col => names[col] || col);
@@ -73,4 +79,3 @@ class AdminSettingServiceClass {
 }
 
 const AdminSettingService = new AdminSettingServiceClass();
-

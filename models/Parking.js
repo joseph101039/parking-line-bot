@@ -14,7 +14,6 @@ class Parking {
         this.address_floor = data.address_floor || "";
         this.enabled = data.enabled === true || data.enabled === "TRUE";
         this.contact_id = data.contact_id || 0; // foreign key: Contact.id
-
     }
     // 欄位對應中文名稱
     static getFieldNames() {
