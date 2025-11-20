@@ -7,7 +7,6 @@ function doPost(e) {
         const events = payload.events || [];
         events.forEach(ev => {
           try {
-            UserService.trackUserFromEvent(ev);
              if (ev.type === "message" && ev.message.type === "text") {
                handleTextEvent(ev);
              } else if (ev.type === "postback") {
@@ -15,6 +14,8 @@ function doPost(e) {
              } else {
                // 可擴充處理 join/leave 等事件
              }
+
+              UserService.trackUserFromEvent(ev);
            } catch (innerErr) {
                 Logger.log(innerErr);
                 console.error("handle event error:", innerErr);

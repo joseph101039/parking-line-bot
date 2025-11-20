@@ -19,7 +19,7 @@
 
 2. 如果是訊息格式錯誤 log 出訊息再貼到 [Flex message simulator](https://developers.line.biz/flex-simulator/) 測試
 
-
+# 程式與設置
 
 ## Google Sheets (Database)
 
@@ -43,12 +43,21 @@ https://console.cloud.google.com/logs/query?authuser=1&hl=zh-TW&project=graphic-
 
 - 查看 Google Apps Script logs
 
-# Google Apps Script Editor
+## Google Apps Script Editor
 
 https://script.google.com/home/projects/1I-uW3RuCpT23gny7k9vp1LxuoF32yb6qFgQqCr0F2gvvTD1GwoJ6B9WZ/projecthistory
 
-# How to use clasp 
+
+
+# 教學文件
+
+## How to use clasp 
 
 https://codelabs.developers.google.com/codelabs/clasp?hl=zh-tw#0
 
 - 用以上傳 Google Apps Script 專案
+
+
+## APP Script 文件
+
+https://developers.google.com/apps-script/guides/logging?hl=zh-tw

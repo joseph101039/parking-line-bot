@@ -23,6 +23,7 @@ class AdminControllerClass {
             this._handleUserList(replyToken);
             return;
         }
+        Logger.log("% s: %v", action, event)  // todo remove later
         if (action.indexOf("selectUser:") === 0) {
             const lineId = action.split(":")[1];
             this._handleUserDetail(replyToken, lineId);
@@ -54,13 +55,9 @@ class AdminControllerClass {
         }
 
 
-        if (action === "queryGroupId") {
-            if (!groupId) {
-                LineService.replyText(replyToken, "請於群組內使用此功能");
-                return;
-            }
+        if (action === "queryGroupId" ) {
             this._handleQueryGroupId(replyToken, groupId);
-            return;
+             return;
         }
         if (action === "setGroupId") {
             if (!groupId) {
@@ -83,7 +80,11 @@ class AdminControllerClass {
     }
 
     _handleQueryGroupId(replyToken, groupId) {
-        LineService.replyText(replyToken, "目前所在群組 ID: " + groupId);
+        const storedGroupId = AdminSettingService.getUserGroupId();
+        const lines = [];
+        lines.push("目前所在群組 ID: " + (groupId || "不在群組內"));
+        lines.push("當前設置群組ID: " + (storedGroupId || "尚未設置"));
+        LineService.replyText(replyToken, lines.join("\n"));
     }
 
     _handleSetGroupId(replyToken, groupId) {
@@ -131,69 +132,115 @@ class AdminControllerClass {
     _handleUserList(replyToken) {
         const users = UserService.getAllUsers();
         if (!users.length) {
-            LineService.replyText(replyToken, "尚未同步使用者，請使用者至少傳送一則訊息。");
-            return;
+          LineService.replyText(replyToken, "尚未同步使用者，請使用者至少傳送一則訊息。");
+          return;
         }
-        const rows = users.map(u => this._buildUserListRow(u));
+        const admins = [];
+        const normals = [];
+        const disabled = [];
+        users.forEach(u => {
+          if (!u.enabled) {
+            disabled.push(u);
+          } else if (u.is_admin) {
+            admins.push(u);
+          } else {
+            normals.push(u);
+          }
+        });
+        const mixed = admins.concat(normals, disabled);
+        const rows = [];
+        mixed.forEach((user, idx) => {
+          rows.push(this._buildUserButton(user));
+          if (idx !== mixed.length - 1) {
+            rows.push({ type: "separator", margin: "xs" });
+          }
+        });
         const bubble = {
-            type: "bubble",
-            body: {
+          type: "bubble",
+          body: {
+            type: "box",
+            layout: "vertical",
+            contents: [
+              { type: "text", text: "使用者列表", weight: "bold", size: "lg" },
+              { type: "text", text: "點擊使用者編輯狀態", size: "sm" },
+              {
                 type: "box",
                 layout: "vertical",
-                contents: [
-                    {type: "text", text: "使用者列表", weight: "bold", size: "lg"},
-                    {
-                        type: "box",
-                        layout: "vertical",
-                        margin: "md",
-                        contents: rows
-                    }
-                ]
-            }
-        };
-        Logger.log(JSON.stringify(bubble));  // todo remove
-        LineService.replyFlex(replyToken, "使用者列表", bubble);
-    }
-
-    _buildUserListRow(user) {
-        const grayColor = user.enabled ? "#000000" : "#999999";
-        return {
-            type: "box",
-            layout: "horizontal",
-            spacing: "sm",
-            // paddingAll: "8px",
-            backgroundColor: user.enabled ? "#FFFFFF" : "#f0f0f0",
-            action: {type: "postback", data: "adminSetting:selectUser:" + user.line_id},
-            contents: [
-                {
-                    type: "image",
-                    url: user.picture_url || "https://cdn-icons-png.flaticon.com/512/149/149071.png",
-                    size: "md",
-                    aspectMode: "cover",
-                    aspectRatio: "1:1",
-                    align: "start",
-                    gravity: "center",
-                    // cornerRadius: "md"
-                },
-                {
-                    type: "text",
-                    text: user.display_name || user.line_id,
-                    flex: 4,
-                    size: "sm",
-                    weight: "bold",
-                    color: grayColor,
-                    wrap: true
-                },
-                {
-                    type: "text",
-                    text: user.is_admin ? "管理員" : "X",
-                    size: "xs",
-                    color: grayColor,
-                    align: "end"
-                }
+                margin: "md",
+                spacing: "sm",
+                contents: rows
+              }
             ]
+          }
         };
-    }
+        LineService.replyFlex(replyToken, "使用者列表", bubble);
+      }
+
+      _buildUserButton(user) {
+        const isDisabled = !user.enabled;
+        const isAdmin = user.enabled && user.is_admin;
+        const nameColor = isDisabled ? "#999999" : (isAdmin ? "#c94542" : "#000000");
+        const badgeText = isDisabled ? "X" : (isAdmin ? "管" : "-");
+        const badgeColor = nameColor;
+        const baseAvatarBox = {
+          type: "box",
+          layout: "horizontal",
+          backgroundColor: "#FFFFFF",
+          cornerRadius: "xxl",
+          contents: [
+            {
+              type: "image",
+              url: user.picture_url || "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+              size: "md",
+              aspectMode: "cover",
+              aspectRatio: "1:1"
+            }
+          ]
+        };
+        if (isDisabled) {
+          baseAvatarBox.contents.push({
+            type: "box",
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            backgroundColor: "#FFFFFFAA",
+            layout: "vertical",
+            contents: []
+          });
+        }
+        return {
+          type: "box",
+          layout: "horizontal",
+          spacing: "sm",
+          backgroundColor: "#FFFFFF",
+          paddingAll: "sm",
+          action: { type: "postback", data: "adminSetting:selectUser:" + user.line_id },
+          contents: [
+            baseAvatarBox,
+            {
+              type: "text",
+              text: user.display_name || user.line_id,
+              flex: 4,
+              size: "sm",
+              weight: isAdmin ? "bold" : "regular",
+              color: nameColor,
+              wrap: false,
+              align: "start",
+              gravity: "center",
+              offsetStart: "md"
+            },
+            {
+              type: "text",
+              text: badgeText,
+              size: "md",
+              color: badgeColor,
+              align: "center",
+              gravity: "center",
+              weight: isDisabled ? "bold" : "regular"
+            }
+          ]
+        };
+      }
 
     _handleUserDetail(replyToken, lineId) {
         const found = UserService.findUser(lineId);
@@ -347,8 +394,8 @@ class AdminControllerClass {
                 type: "box",
                 layout: "vertical",
                 contents: [
-                    {type: "text", text: "使用者群組設置", weight: "bold", size: "lg"},
-                    {type: "text", text: "將當前群組設置成取得使用者清單的群組", size: "sm", wrap: true, margin: "md"}
+                    {type: "text", text: "設置使用者群組", weight: "bold", size: "lg"},
+                    {type: "text", text: "只有此群組內使用者可以使用車庫管家", size: "sm", wrap: true, margin: "md"}
                 ]
             },
             footer: {
@@ -359,12 +406,12 @@ class AdminControllerClass {
                     {
                         type: "button",
                         style: "primary",
-                        action: {type: "postback", label: "查詢當前群組ID", data: "adminSetting:queryGroupId"}
+                        action: {type: "postback", label: "查詢群組ID設置", data: "adminSetting:queryGroupId"}
                     },
                     {
                         type: "button",
                         style: "secondary",
-                        action: {type: "postback", label: "設置群組ID", data: "adminSetting:setGroupId"}
+                        action: {type: "postback", label: "設置為當前群組ID", data: "adminSetting:setGroupId"}
                     }
                 ]
             }
